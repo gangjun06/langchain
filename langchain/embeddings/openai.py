@@ -311,7 +311,7 @@ class OpenAIEmbeddings(BaseModel, Embeddings):
             to_retry = [(tokens[i], i) for i in range(len(response["data"]))
                         if len(response["data"][i]["embedding"]) < 1536]
             print(f"[OpenAILog] Found {len(to_retry)} errors.")
-​
+            
             while len(to_retry) > 0:
                 cur_token, idx = to_retry[-1]
                 retried_response = embed_with_retry(
