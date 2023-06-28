@@ -300,10 +300,32 @@ class OpenAIEmbeddings(BaseModel, Embeddings):
         _chunk_size = chunk_size or self.chunk_size
         for i in range(0, len(tokens), _chunk_size):
             response = embed_with_retry(
-                self,
-                input=tokens[i : i + _chunk_size],
-                **self._invocation_params,
-            )
+                    self,
+                    input=tokens[i : i + _chunk_size],
+                    engine=self.deployment,
+                    request_timeout=self.request_timeout,
+                    headers=self.headers,
+                )
+            
+            # Hotfix for the embedding error.
+            to_retry = [(tokens[i], i) for i in range(len(response["data"]))
+                        if len(response["data"][i]["embedding"]) < 1536]
+            print(f"[OpenAILog] Found {len(to_retry)} errors.")
+            
+            while len(to_retry) > 0:
+                cur_token, idx = to_retry[-1]
+                retried_response = embed_with_retry(
+                    self,
+                    input=[cur_token],
+                    engine=self.deployment,
+                    request_timeout=self.request_timeout,
+                    headers=self.headers,
+                )
+                if len(retried_response["data"][0]["embedding"]) == 1536:
+                    print(f"[OpenAILog] Replacing embedding for chunk {idx}.")
+                    response["data"][idx]["embedding"] = retried_response["data"][0]["embedding"]
+                    to_retry.pop()
+            
             batched_embeddings += [r["embedding"] for r in response["data"]]
 
         results: List[List[List[float]]] = [[] for _ in range(len(texts))]
